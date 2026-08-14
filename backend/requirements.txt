@@ -1,0 +1,41 @@
+# Core AI
+langchain
+langchain-community
+langchain-core
+langgraph
+
+# Mistral
+mistralai
+langchain-mistralai
+
+# Vector Database
+chromadb
+
+# Embeddings
+sentence-transformers
+
+# API Backend
+fastapi
+uvicorn
+
+# Data Processing
+pandas
+numpy
+
+# Environment Variables
+python-dotenv
+
+# Validation
+pydantic
+
+# HTTP Requests
+requests
+
+# Tokenization
+tiktoken
+
+# Optional Utilities
+tqdm
+
+# Logging
+loguru
