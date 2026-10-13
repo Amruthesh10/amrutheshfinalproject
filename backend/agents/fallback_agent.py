@@ -1,5 +1,4 @@
-from config.mistral_client import client
-
+from config.groq_client import client, MODEL_NAME
 
 SYSTEM_PROMPT = """
 You are a helpful E-Commerce Assistant.
@@ -16,11 +15,9 @@ Your task:
 6. Be concise and helpful.
 """
 
-
 def fallback_agent(state):
-
-    response = client.chat.complete(
-        model="mistral-small-latest",
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
         messages=[
             {
                 "role": "system",
@@ -38,11 +35,14 @@ Extracted Preferences:
 No matching products were found.
 """
             }
-        ]
+        ],
+        temperature=0.3,
+        max_completion_tokens=600,
     )
 
     state["response"] = (
-        response.choices[0].message.content
+        response.choices[0].message.content or
+        "No matching products were found. Try changing your budget or product preferences."
     )
 
     return state

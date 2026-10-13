@@ -1,7 +1,7 @@
 from graph.workflow import app
 
 initial_state = {
-    "query": "Suggest Samsung phone under 20000"
+    "query": "Suggest  phone under 20000 with good battery backup"
 }
 
 result = app.invoke(initial_state)

@@ -1,8 +1,7 @@
 import json
 import re
 
-from config.mistral_client import client
-
+from config.groq_client import client, MODEL_NAME
 SYSTEM_PROMPT = """
 You are a Product Validation Agent.
 
@@ -39,8 +38,8 @@ def validation_agent(state):
             }
         )
 
-    response = client.chat.complete(
-        model="mistral-small-latest",
+    response = client.chat.completions.create(
+            model=MODEL_NAME,
         messages=[
             {
                 "role": "system",

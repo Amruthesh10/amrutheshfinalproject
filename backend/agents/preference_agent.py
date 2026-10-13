@@ -1,5 +1,5 @@
 import json
-from config.mistral_client import client
+from config.groq_client import client, MODEL_NAME
 
 SYSTEM_PROMPT = """
 You are the Preference Extraction Agent of an intelligent E-Commerce Recommendation System.
@@ -131,6 +131,62 @@ Output:
 """
 
 def preference_agent(state):
+    query = state["query"]
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": query},
+        ],
+        temperature=0.1,
+        max_completion_tokens=600,
+    )
+
+    content = response.choices[0].message.content or ""
+
+    try:
+        # Handle JSON wrapped in markdown fences if returned
+        content = content.strip()
+
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1]
+            content = content.rsplit("```", 1)[0].strip()
+
+        preferences = json.loads(content)
+
+        # Ensure required keys exist
+        defaults = {
+            "category": None,
+            "budget_min": None,
+            "budget_max": None,
+            "brand": None,
+            "use_case": None,
+            "specifications": [],
+            "sort_preference": None,
+            "product_type": None,
+            "recommendation_query": False,
+        }
+
+        defaults.update(preferences)
+        preferences = defaults
+
+    except (json.JSONDecodeError, TypeError, ValueError):
+        preferences = {
+            "category": None,
+            "budget_min": None,
+            "budget_max": None,
+            "brand": None,
+            "use_case": None,
+            "specifications": [],
+            "sort_preference": None,
+            "product_type": None,
+            "recommendation_query": False,
+        }
+
+    state["preferences"] = preferences
+    return state
+
 
     query = state["query"]
 

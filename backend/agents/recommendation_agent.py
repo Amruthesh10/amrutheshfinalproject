@@ -1,5 +1,4 @@
-from config.mistral_client import client
-
+from config.groq_client import client, MODEL_NAME
 
 SYSTEM_PROMPT = """
 You are an expert E-Commerce Product Recommendation Agent.
@@ -29,8 +28,8 @@ def recommendation_agent(state):
 
     products = state["analyzed_products"][:5]
 
-    response = client.chat.complete(
-        model="mistral-small-latest",
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
         messages=[
             {
                 "role": "system",
