@@ -13,6 +13,9 @@ chroma_db/
 
 # Environment Variables
 .env
+.env.*
+!.env.example
+backend/.env
 
 # OS Files
 .DS_Store

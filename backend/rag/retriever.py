@@ -2,7 +2,7 @@ from chromadb import PersistentClient
 from sentence_transformers import SentenceTransformer
 
 client = PersistentClient(
-    path="backend/chroma_db"
+    path="./backend/chroma_db"
 )
 
 collection = client.get_collection(

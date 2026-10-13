@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 df = pd.read_csv("backend/data/product_documents.csv")
 
 # ChromaDB persistent storage
-client = PersistentClient(path="backend/chroma_db")
+client = PersistentClient(path="./backend/chroma_db")
 
 collection = client.get_or_create_collection(
     name="products"
