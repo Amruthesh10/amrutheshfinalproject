@@ -21,6 +21,7 @@ class AgentState(TypedDict, total=False):
     comparison_brands: List[str]
     comparison_results: Dict[str, Any]
     comparison_status: str
+    comparison_missing_products: List[str]
     comparison_retrieved_products: List[Dict[str, Any]]
     validated_comparison_products: List[Dict[str, Any]]
 

@@ -206,6 +206,110 @@ DEFAULT_PREFERENCES = {
 }
 
 
+COMPARISON_INTENT_PATTERN = re.compile(
+    r"\b(?:compare|comparison|contrast|difference|differences|"
+    r"differentiate|versus|vs\.?)\b|"
+    r"\bwhich(?:\s+one)?\s+(?:is|would be)\s+better\b",
+    re.IGNORECASE,
+)
+
+COMPARISON_SEPARATOR_PATTERN = re.compile(
+    r"\s+(?:and|or|versus|vs\.?|with)\s+",
+    re.IGNORECASE,
+)
+
+CRITERIA_PATTERN = re.compile(
+    r"\s+(?:based on|in terms of|with respect to|regarding|"
+    r"considering|focusing on|for|on|in)\b.*$",
+    re.IGNORECASE,
+)
+
+
+def _is_comparison_query(query):
+    return bool(COMPARISON_INTENT_PATTERN.search(query))
+
+
+def _extract_comparison_products(query):
+    """Extract the two sides of common natural-language comparisons."""
+    text = query.strip().rstrip("?.! ")
+
+    prefixes = (
+        r"^(?:please\s+)?compare\b",
+        r"^(?:what(?:\s+is|'s)?\s+)?the\s+differences?\s+between\b",
+        r"^differences?\s+between\b",
+        r"^which(?:\s+one)?\s+(?:is|would be)\s+better\b",
+    )
+    for prefix in prefixes:
+        text = re.sub(prefix, "", text, flags=re.IGNORECASE).strip()
+        if text != query.strip().rstrip("?.! "):
+            break
+
+    text = re.sub(
+        r"^(?:these|the)\s+two\s+(?:(?:phones?|laptops?|products?|"
+        r"devices?|models?)\s+)?",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = CRITERIA_PATTERN.split(text, maxsplit=1)[0].strip()
+
+    products = COMPARISON_SEPARATOR_PATTERN.split(text, maxsplit=1)
+    if len(products) != 2:
+        return []
+
+    cleaned = [
+        re.sub(r"^[\s,.:;]+|[\s,.:;]+$", "", product).strip()
+        for product in products
+    ]
+    cleaned = [
+        re.sub(r"^(?:the|a|an)\s+", "", product, flags=re.IGNORECASE)
+        for product in cleaned
+    ]
+    return cleaned if all(cleaned) else []
+
+
+def _extract_comparison_criteria(query):
+    known_criteria = (
+        "value for money",
+        "battery life",
+        "performance",
+        "processor",
+        "camera",
+        "battery",
+        "price",
+        "rating",
+        "ratings",
+        "ram",
+        "storage",
+        "display",
+    )
+    criteria_match = re.search(
+        r"\b(?:based on|in terms of|with respect to|regarding|"
+        r"considering|focusing on|on|in)\s+(.+)$",
+        query,
+        re.IGNORECASE,
+    )
+    if not criteria_match:
+        return []
+
+    criteria_text = criteria_match.group(1).lower()
+    if "battery life" in criteria_text:
+        known_criteria = tuple(
+            criterion for criterion in known_criteria if criterion != "battery"
+        )
+
+    found = [
+        criterion
+        for criterion in known_criteria
+        if re.search(rf"\b{re.escape(criterion)}\b", criteria_text)
+    ]
+    found.sort(key=lambda criterion: criteria_text.find(criterion))
+    return [
+        "RAM" if criterion == "ram" else criterion.title()
+        for criterion in found
+    ]
+
+
 def _extract_json(content):
     """Parse JSON, including responses wrapped in Markdown fences."""
     content = (content or "").strip()
@@ -223,6 +327,8 @@ def _extract_json(content):
 
 def preference_agent(state):
     query = state.get("query", "").strip()
+    is_comparison = _is_comparison_query(query)
+    parsed_products = _extract_comparison_products(query)
 
     if not query:
         state["preferences"] = DEFAULT_PREFERENCES.copy()
@@ -266,6 +372,18 @@ def preference_agent(state):
             if not isinstance(preferences[key], list):
                 preferences[key] = []
 
+        # Keep explicit comparison language reliable even if the LLM's
+        # classification or product extraction is incomplete.
+        if is_comparison:
+            preferences["intent"] = "comparison"
+            if parsed_products:
+                preferences["comparison_products"] = parsed_products
+
+            if not preferences["comparison_criteria"]:
+                preferences["comparison_criteria"] = (
+                    _extract_comparison_criteria(query)
+                )
+
         # Keep the shopping flag consistent with the intent.
         preferences["recommendation_query"] = (
             preferences["intent"] in {"comparison", "recommendation"}
@@ -275,10 +393,26 @@ def preference_agent(state):
 
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         print(f"Preference extraction parsing error: {exc}")
-        state["preferences"] = DEFAULT_PREFERENCES.copy()
+        preferences = DEFAULT_PREFERENCES.copy()
+        if is_comparison:
+            preferences["intent"] = "comparison"
+            preferences["comparison_products"] = parsed_products
+            preferences["comparison_criteria"] = (
+                _extract_comparison_criteria(query)
+            )
+            preferences["recommendation_query"] = True
+        state["preferences"] = preferences
 
     except Exception as exc:
         print(f"Preference agent error: {exc}")
-        state["preferences"] = DEFAULT_PREFERENCES.copy()
+        preferences = DEFAULT_PREFERENCES.copy()
+        if is_comparison:
+            preferences["intent"] = "comparison"
+            preferences["comparison_products"] = parsed_products
+            preferences["comparison_criteria"] = (
+                _extract_comparison_criteria(query)
+            )
+            preferences["recommendation_query"] = True
+        state["preferences"] = preferences
 
     return state

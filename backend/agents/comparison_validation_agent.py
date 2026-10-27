@@ -1,10 +1,7 @@
 
 from typing import Any, Dict, List
 
-
-def normalize(value: Any) -> str:
-    """Normalize product names for comparison validation."""
-    return " ".join(str(value).lower().strip().split())
+from agents.comparison_retrieval_agent import is_requested_product_match
 
 
 def comparison_validation_agent(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -31,14 +28,10 @@ def comparison_validation_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     validated_products: List[Dict[str, Any]] = []
 
     for requested_name in requested_products:
-        requested_normalized = normalize(requested_name)
-
         matched_index = None
 
         for index, product in enumerate(remaining_products):
-            actual_name = normalize(product.get("name", ""))
-
-            if actual_name == requested_normalized:
+            if is_requested_product_match(requested_name, product):
                 matched_index = index
                 break
 

@@ -32,6 +32,12 @@ General rules:
 """
 
 
+def _markdown_value(value):
+    if value is None or str(value).strip().lower() in {"", "nan", "none"}:
+        return "Unavailable"
+    return str(value).replace("|", r"\|").replace("\n", " ")
+
+
 def explanation_agent(state):
 
     preferences = state.get("preferences", {})
@@ -50,25 +56,80 @@ def explanation_agent(state):
             )
             return state
 
-        task_data = json.dumps(
-            comparison_results,
-            indent=2,
-            ensure_ascii=False,
-            default=str,
+        products = comparison_results.get(
+            "products",
+            state.get("validated_comparison_products", []),
         )
+        comparisons = comparison_results.get("comparisons", [])
+        if len(products) < 2:
+            state["response"] = (
+                "I couldn't generate a reliable comparison because both "
+                "verified product records are not available."
+            )
+            return state
 
-        task_instruction = """
-Generate the final product comparison.
+        product_names = [
+            _markdown_value(product.get("name", f"Product {index + 1}"))
+            for index, product in enumerate(products[:2])
+        ]
+        lines = [
+            "### Product comparison",
+            "",
+            f"Products: **{product_names[0]}** and **{product_names[1]}**",
+            "",
+            "| Criterion | " + " | ".join(product_names) + " | Assessment |",
+            "| --- | " + " | ".join("---" for _ in product_names) + " | --- |",
+        ]
 
-Include:
-1. A comparison table.
-2. Key differences.
-3. Advantages and disadvantages.
-4. Best value for money, when supported by the data.
-5. A final verdict based on the user's requirements.
+        for comparison in comparisons:
+            values = comparison.get("values", [])
+            left = _markdown_value(values[0] if values else None)
+            right = _markdown_value(values[1] if len(values) > 1 else None)
+            assessment = _markdown_value(comparison.get("assessment"))
+            criterion = _markdown_value(comparison.get("criterion"))
+            lines.append(
+                f"| {criterion} | {left} | {right} | {assessment} |"
+            )
 
-Clearly mention unavailable information.
-"""
+        lines.extend(["", "**Catalog details**", ""])
+        lines.extend(
+            [
+                "| Attribute | " + " | ".join(product_names) + " |",
+                "| --- | " + " | ".join("---" for _ in product_names) + " |",
+            ]
+        )
+        for label, field in (
+            ("Catalog price", "discount_price"),
+            ("List price", "actual_price"),
+            ("Rating", "ratings"),
+            ("Number of ratings", "no_of_ratings"),
+            ("Category", "category"),
+        ):
+            row_values = [
+                _markdown_value(product.get(field))
+                for product in products[:2]
+            ]
+            lines.append(f"| {label} | {row_values[0]} | {row_values[1]} |")
+
+        recommendation = comparison_results.get("recommendation")
+        if recommendation:
+            lines.extend(
+                ["", f"**Verdict:** {_markdown_value(recommendation)}"]
+            )
+        missing_information = comparison_results.get("missing_information", [])
+        if missing_information:
+            missing = ", ".join(
+                _markdown_value(item) for item in missing_information
+            )
+            lines.extend(
+                [
+                    "",
+                    f"**Unavailable in the catalog:** {missing}.",
+                ]
+            )
+
+        state["response"] = "\n".join(lines)
+        return state
 
     else:
 
